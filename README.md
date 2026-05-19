@@ -1,6 +1,5 @@
 ﻿# 2-DoF Fish Robot - Kinematics Project
 
-
 Robotic fish have attracted significant attention for their biomimetic design and applications in environmental monitoring, biological surveys, and underwater exploration. Unlike propeller-driven systems, which generate noise and disturb marine ecosystems, robotic fish provide efficient and less intrusive locomotion.
 
 This project builds on the work of Wang et al. (2026) by focusing on the kinematic modeling of a wire-driven fish equipped with a 2-DoF crank-slider mechanism. The design decouples propulsion from steering, enabling both high swimming speed and agile maneuverability. While the original study employed servo-based continuous rotation control, our project simplifies the system using budget-friendly components and replaces the motor control with an encoder-based PID algorithm. This ensures smooth, accurate motion while retaining the core crank-slider actuation and robotic system architecture.
@@ -31,14 +30,16 @@ This project builds on the work of Wang et al. (2026) by focusing on the kinemat
 - [Hardware and Programming Implementation](#hardware-and-programming-implementation)
 - [Conclusion](#conclusion)
 - [References and Links](#references-and-links)
+
 ---
 
 ## Design Analysis
 
 In this section, we analyze the Biomimetic Fish Robot Based on a Modified 2-DoF Crank-Slider / Slotted Crank-Rocker Mechanism.
-![Figure 1: FishRobotRenderedImaget](images/FishRobotRenderedImage.png)
-*Figure 1: Fish Robot Rendered Image*
 
+![Figure 1: FishRobotRenderedImaget](images/FishRobotRenderedImage.png)
+
+_Figure 1: Fish Robot Rendered Image_
 
 ### 1. Original Design Concept from the Research Paper
 
@@ -47,9 +48,10 @@ The original robotic fish consists of a rigid head shell, segmented rear body, e
 The actuation mechanism in the paper contains two independently controlled driving wheels connected to a slotted rod and reel. The reel drives a wire connected to the tail. The main advantage of the mechanism is that it can operate in symmetric and asymmetric modes. In symmetric mode, both motors rotate together to produce forward propulsion. In asymmetric mode, one motor can create a mean tail offset while the other provides continuous oscillation, allowing turning motion.
 
 The original prototype used compact DYNAMIXEL servo motors, a PLA body and head, SUS304 stainless steel linkage components, a silicone waterproof skin, and an elastic urethane spine. The paper reports that the prototype was 502 mm long, 83 mm wide, 128 mm high, and had a mass of 2050 g.
+
 ![Figure 2: Reference2-DoFActuationConceptandTheAdaptedSolidWorksLinkageLayout1](images/Reference2-DoFActuationConceptandTheAdaptedSolidWorksLinkageLayout1.png)
 ![Figure 2.5: Reference2-DoFActuationConceptandTheAdaptedSolidWorksLinkageLayout2](images/Reference2-DoFActuationConceptandTheAdaptedSolidWorksLinkageLayout2.png)
-*Figure 2: Reference 2-DoF Actuation Concept and The Adapted SolidWorks Linkage Layout*
+_Figure 2: Reference 2-DoF Actuation Concept and The Adapted SolidWorks Linkage Layout_
 
 ### 2. Description of the SolidWorks Design
 
@@ -67,7 +69,7 @@ The mechanism in the SolidWorks design is best described as a double-input slott
 
 The rocker type used in this design is a slotted rocker. It is "slotted" because the crank pins move inside long slots, and it is a "rocker" because its output is limited to angular oscillation rather than full rotation.
 
-The output of the rocker is transmitted to the elastic tail through a driving wire. One end of the wire is fixed to the reel, which is attached to the central rocker link, and the other end is fixed to the trailing section of the elastic spine. As the rocker oscillates, it winds and unwinds the wire alternately, pulling the tail from side to side and generating the oscillatory body motion required for propulsion. The wire offset distance *d* from the spine centerline converts the reel's angular displacement directly into the tail attack angle θₐ.
+The output of the rocker is transmitted to the elastic tail through a driving wire. One end of the wire is fixed to the reel, which is attached to the central rocker link, and the other end is fixed to the trailing section of the elastic spine. As the rocker oscillates, it winds and unwinds the wire alternately, pulling the tail from side to side and generating the oscillatory body motion required for propulsion. The wire offset distance _d_ from the spine centerline converts the reel's angular displacement directly into the tail attack angle θₐ.
 
 In its complete actuated form, the system has two actuated degrees of freedom because it uses two independently driven motors. The motors are independently controlled — one input can affect oscillation frequency and the other can affect the mean tail angle. However, if both motors are synchronized or if one motor is fixed while the other rotates, the mechanism behaves as an effective 1-DOF mechanism during that operating condition.
 
@@ -75,7 +77,7 @@ The degrees of freedom of the mechanism are verified using the Kutzbach criterio
 
 $$M = 3(n - 1) - 2j_1 - j_2$$
 
-where *n* is the number of links, *j₁* is the number of full joints (one degree of freedom each), and *j₂* is the number of half joints (two degrees of freedom each). The mechanism consists of 5 links: the ground frame, the two driving cranks (gear disks), middle gear, and the central slotted rocker. It has 4 full joints: the two revolute joints at the motor shafts and the two pin-in-slot joints between the crank pins and the rocker slots.
+where _n_ is the number of links, _j₁_ is the number of full joints (one degree of freedom each), and _j₂_ is the number of half joints (two degrees of freedom each). The mechanism consists of 5 links: the ground frame, the two driving cranks (gear disks), middle gear, and the central slotted rocker. It has 4 full joints: the two revolute joints at the motor shafts and the two pin-in-slot joints between the crank pins and the rocker slots.
 
 Substituting:
 
@@ -112,13 +114,13 @@ The spine should be made from a flexible material such as rubber, silicone, TPU,
 
 **Table 1: Selected Part Material**
 
-| Part | Suggested Material | Reason |
-|---|---|---|
-| Head tub / rigid shell | PLA | Easy to 3D print, rigid, suitable for prototypes |
-| Body segments | PLA | Lightweight and simple to manufacture |
-| Slotted rocker / linkage | Aluminum or SUS304 stainless steel | Higher stiffness and better wear resistance |
-| Gear shafts | Steel or stainless steel | Good strength and alignment stability |
-| Spine | TPU, rubber, or silicone | Flexible and suitable for oscillating tail motion |
+| Part                     | Suggested Material                 | Reason                                            |
+| ------------------------ | ---------------------------------- | ------------------------------------------------- |
+| Head tub / rigid shell   | PLA                                | Easy to 3D print, rigid, suitable for prototypes  |
+| Body segments            | PLA                                | Lightweight and simple to manufacture             |
+| Slotted rocker / linkage | Aluminum or SUS304 stainless steel | Higher stiffness and better wear resistance       |
+| Gear shafts              | Steel or stainless steel           | Good strength and alignment stability             |
+| Spine                    | TPU, rubber, or silicone           | Flexible and suitable for oscillating tail motion |
 
 ### 6. Limitations of the Current Design
 
@@ -194,7 +196,6 @@ $$x = \frac{L}{\theta_a}\sin\theta_a, \quad y = \frac{L}{\theta_a}(1 - \cos\thet
 
 For small θₐ, a linear approximation is used to maintain numerical stability.
 
-
 #### 4. Velocity Estimation and Propulsion
 
 The reel angular velocity is approximated numerically:
@@ -225,9 +226,12 @@ The model successfully integrates kinematics and motion generation; however, sev
 Despite these limitations, the model provides a computationally efficient framework for simulating robotic fish motion.
 
 ![Figure 3: CoordinateSystemsAndKinematicParametersOfTheFishRobot](images/CoordinateSystemsAndKinematicParametersOfTheFishRobot.png)
-*Figure 3: Coordinate Systems And Kinematic Parameters Of The Fish Robot*
+
+_Figure 3: Coordinate Systems And Kinematic Parameters Of The Fish Robot_
+
 ![Figure 4: CADModelOfTheDual-CrankReelMechanismForTailActuation](images/CADModelOfTheDual-CrankReelMechanismForTailActuation.png)
-*Figure 4: CAD Model Of The Dual-Crank Reel Mechanism For Tail Actuation*
+
+_Figure 4: CAD Model Of The Dual-Crank Reel Mechanism For Tail Actuation_
 
 ---
 
@@ -286,11 +290,11 @@ $$[v_{robot}, \psi_{robot}] = g_2(\theta_3, \dot{\theta}_3) = g_2(f_2(\varphi, \
 
 The sign of φ determines the direction of turning:
 
-| φ value | Effect |
-|---|---|
-| φ < 0 (e.g., −π/2) | Tail biased right → robot turns right |
-| φ > 0 (e.g., +π/2) | Tail biased left → robot turns left |
-| φ = 0 | Reduces to symmetric case → robot swims straight |
+| φ value            | Effect                                           |
+| ------------------ | ------------------------------------------------ |
+| φ < 0 (e.g., −π/2) | Tail biased right → robot turns right            |
+| φ > 0 (e.g., +π/2) | Tail biased left → robot turns left              |
+| φ = 0              | Reduces to symmetric case → robot swims straight |
 
 This is consistent with the paper's experimental result, where fixing Motor 2 at −90° produced a turning radius of 0.56 m (1.12 BL), completing one full circle in 14 seconds.
 
@@ -308,8 +312,10 @@ The following components were used for the implementation:
 - LiPo Battery 3S 30C 1800mAh
 - 3S LiPo Battery Balance Charger
 - 12V to 5V Voltage Converter
+
 ![Figure 5: CircuitDesign](images/CircuitDesign.png)
-*Figure 5: Circuit Design*
+
+_Figure 5: Circuit Design_
 
 ### Programming and Control Algorithm
 
@@ -371,8 +377,10 @@ All PID integrators are reset at each mode transition to prevent windup carry-ov
 
 ## References and Links
 
-- Wang, Y., Chen, C., Chen, Y., Li, J., Motegi, Y., Ohkuma, K., Maki, T., & Zhao, M. (2026). *Design, modeling and direction control of a wire-driven robotic fish based on a 2-DoF crank-slider mechanism*. arXiv. <https://arxiv.org/abs/2603.02851>
+- Wang, Y., Chen, C., Chen, Y., Li, J., Motegi, Y., Ohkuma, K., Maki, T., & Zhao, M. (2026). _Design, modeling and direction control of a wire-driven robotic fish based on a 2-DoF crank-slider mechanism_. arXiv. <https://arxiv.org/abs/2603.02851>
 
-- Lee, S., Park, J., & Han, C. (2007). Optimal control of a mackerel-mimicking robot for energy efficient trajectory tracking. *Journal of Bionic Engineering*, 4(4), 209–215. <https://doi.org/10.1016/S1672-6529(07)60029-7>
+- Lee, S., Park, J., & Han, C. (2007). Optimal control of a mackerel-mimicking robot for energy efficient trajectory tracking. _Journal of Bionic Engineering_, 4(4), 209–215. <https://doi.org/10.1016/S1672-6529(07)60029-7>
+
 ---
+
 **Done by** Ali Ismail, Maria Al Sayed, Ghadi Ammar, and Elie Mina
