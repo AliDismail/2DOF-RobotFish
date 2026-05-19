@@ -1,0 +1,332 @@
+
+<style>
+  body{margin:0}
+  .ctrl{display:flex;align-items:center;gap:10px;margin:4px 0;font-size:13px;color:var(--color-text-secondary)}
+  .ctrl label{min-width:90px}
+  .ctrl span{min-width:36px;font-size:13px;font-weight:500;color:var(--color-text-primary)}
+  .panel{background:var(--color-background-secondary);border-radius:var(--border-radius-lg);padding:14px 18px;margin-bottom:12px}
+  .row{display:flex;gap:12px;flex-wrap:wrap}
+  .stat{background:var(--color-background-primary);border:0.5px solid var(--color-border-tertiary);border-radius:var(--border-radius-md);padding:8px 14px;min-width:100px}
+  .stat-l{font-size:12px;color:var(--color-text-secondary)}
+  .stat-v{font-size:18px;font-weight:500;color:var(--color-text-primary)}
+  canvas{display:block;width:100%;border-radius:var(--border-radius-lg);border:0.5px solid var(--color-border-tertiary);background:#1a2030}
+</style>
+
+<h2 class="sr-only">Fish robot tail simulation showing the wire-driven elastic tail oscillating in symmetric mode</h2>
+
+<canvas id="c" height="320"></canvas>
+
+<div class="panel" style="margin-top:12px">
+  <div class="row" style="margin-bottom:12px">
+    <div class="stat"><div class="stat-l">Frequency</div><div class="stat-v" id="sv-freq">1.0 Hz</div></div>
+    <div class="stat"><div class="stat-l">Attack angle θₐ</div><div class="stat-v" id="sv-ta">0.0°</div></div>
+    <div class="stat"><div class="stat-l">Reel angle θ₃</div><div class="stat-v" id="sv-t3">0.0°</div></div>
+    <div class="stat"><div class="stat-l">Tail tip Y</div><div class="stat-v" id="sv-ty">0.0 mm</div></div>
+  </div>
+  <div class="ctrl"><label>Frequency</label><input type="range" id="sl-freq" min="1" max="30" value="10" step="1" style="flex:1"><span id="lb-freq">1.0</span> Hz</div>
+  <div class="ctrl"><label>Amplitude</label><input type="range" id="sl-amp"  min="5"  max="45" value="30" step="1" style="flex:1"><span id="lb-amp">30</span> °</div>
+  <div class="ctrl"><label>Mode</label>
+    <select id="sel-mode" style="flex:1;padding:6px 8px;border-radius:var(--border-radius-md);border:0.5px solid var(--color-border-tertiary);background:var(--color-background-primary);color:var(--color-text-primary);font-size:13px">
+      <option value="sym">Symmetric (straight swim)</option>
+      <option value="asym">Asymmetric (turning)</option>
+    </select>
+    <span id="lb-bias" style="font-size:12px;color:var(--color-text-secondary)"></span>
+  </div>
+  <div class="ctrl" id="bias-row" style="display:none"><label>Motor 2 bias θ₂</label><input type="range" id="sl-bias" min="-60" max="60" value="-45" step="1" style="flex:1"><span id="lb-bias2">-45</span> °</div>
+</div>
+
+<script>
+const canvas = document.getElementById('c');
+const ctx = canvas.getContext('2d');
+
+// Geometry constants (mm → pixels: scale factor applied at draw time)
+const Ra=15, Rb=20, L1=45, L2=45, d_wire=10, L_body=200;
+const k_thrust=0.15;
+
+let freq=1.0, amp=30*Math.PI/180, mode='sym', bias2=-45*Math.PI/180;
+let t=0, th3_prev=0, dt=1/60;
+const SCALE=1.2; // px per mm for body
+
+// Resize canvas
+function resize(){
+  canvas.width=canvas.offsetWidth;
+}
+resize();
+
+// FK: given th1,th2 → th3
+function fk(th1,th2){
+  const A=Ra*Rb*(Math.cos(th1)-Math.cos(th2))+Rb*(L1+L2);
+  const B=Ra*Rb*(Math.sin(th2)-Math.sin(th1));
+  const C=Ra*Ra*Math.sin(th1-th2)-Ra*(Math.sin(th1)*L2+Math.sin(th2)*L1);
+  const R=Math.sqrt(A*A+B*B);
+  if(Math.abs(C/R)>1) return null;
+  return Math.asin(C/R)-Math.atan2(B,A);
+}
+
+// Tail arc: returns array of {x,y} points along the constant-curvature arc
+function tailArc(theta_a, n=40){
+  const pts=[];
+  if(Math.abs(theta_a)<0.001){
+    for(let i=0;i<=n;i++) pts.push({x:L_body*i/n, y:0});
+  } else {
+    const radius=L_body/theta_a;
+    for(let i=0;i<=n;i++){
+      const s=L_body*i/n;
+      const ang=(theta_a/L_body)*s;
+      pts.push({x:radius*Math.sin(ang), y:radius*(1-Math.cos(ang))});
+    }
+  }
+  return pts;
+}
+
+// Crank pin position (for drawing the wheel crank)
+function crankPos(cx,cy,r,th){
+  return {x:cx+r*Math.cos(th), y:cy+r*Math.sin(th)};
+}
+
+function draw(){
+  const W=canvas.width, H=canvas.height;
+  ctx.clearRect(0,0,W,H);
+
+  // Background
+  ctx.fillStyle='#1a2030';
+  ctx.fillRect(0,0,W,H);
+
+  // Time step
+  const omega=2*Math.PI*freq;
+  t+=dt;
+
+  let th1, th2;
+  if(mode==='sym'){
+    th1=amp*Math.sin(omega*t);
+    th2=th1;
+  } else {
+    th1=amp*Math.sin(omega*t);
+    th2=bias2;
+  }
+
+  const th3=fk(th1,th2);
+  const th3_val = th3 ?? th3_prev;
+  const th3_dot=(th3_val-th3_prev)/dt;
+  th3_prev=th3_val;
+
+  const theta_a=(Rb/d_wire)*th3_val;
+  const pts=tailArc(theta_a);
+
+  // Layout: head mechanism on left, tail extending right
+  const originX=80, originY=H/2;
+  const S=SCALE;
+
+  // --- Draw water ripple hint ---
+  ctx.save();
+  ctx.strokeStyle='rgba(60,120,200,0.12)';
+  ctx.lineWidth=1;
+  for(let i=0;i<5;i++){
+    ctx.beginPath();
+    ctx.arc(originX+L_body*S*0.5, originY, 30+i*22, 0, Math.PI*2);
+    ctx.stroke();
+  }
+  ctx.restore();
+
+  // --- Draw body cylinder ---
+  const bodyLen=L_body*S;
+  ctx.save();
+  ctx.fillStyle='#2a3555';
+  ctx.strokeStyle='#3d5080';
+  ctx.lineWidth=1;
+  ctx.beginPath();
+  ctx.roundRect(originX-10, originY-18, 70, 36, 6);
+  ctx.fill(); ctx.stroke();
+  ctx.restore();
+
+  // Label: head
+  ctx.fillStyle='#7090c0';
+  ctx.font='11px sans-serif';
+  ctx.fillText('head', originX+2, originY-22);
+
+  // --- Reel circle ---
+  const reelX=originX+50, reelY=originY;
+  ctx.save();
+  ctx.strokeStyle='#4a90d9';
+  ctx.lineWidth=1.5;
+  ctx.beginPath(); ctx.arc(reelX,reelY,Rb*S,0,Math.PI*2); ctx.stroke();
+  // Reel marker
+  const rx=reelX+Rb*S*Math.cos(th3_val);
+  const ry=reelY+Rb*S*Math.sin(th3_val);
+  ctx.strokeStyle='#7ab8f5';
+  ctx.lineWidth=2;
+  ctx.beginPath(); ctx.moveTo(reelX,reelY); ctx.lineTo(rx,ry); ctx.stroke();
+  ctx.fillStyle='#7ab8f5';
+  ctx.beginPath(); ctx.arc(rx,ry,3,0,Math.PI*2); ctx.fill();
+  ctx.restore();
+
+  // Reel label
+  ctx.fillStyle='#5a80b0';
+  ctx.font='10px sans-serif';
+  ctx.fillText('reel (Rb)', reelX-14, reelY-Rb*S-4);
+
+  // --- Motor wheel 1 ---
+  const w1x=originX+18, w1y=originY-20;
+  const p1=crankPos(w1x,w1y,Ra*S,th1);
+  ctx.save();
+  ctx.strokeStyle='#e07050';
+  ctx.lineWidth=1.2;
+  ctx.beginPath(); ctx.arc(w1x,w1y,Ra*S,0,Math.PI*2); ctx.stroke();
+  ctx.strokeStyle='#ff9070';
+  ctx.lineWidth=2;
+  ctx.beginPath(); ctx.moveTo(w1x,w1y); ctx.lineTo(p1.x,p1.y); ctx.stroke();
+  ctx.fillStyle='#ff9070';
+  ctx.beginPath(); ctx.arc(p1.x,p1.y,3,0,Math.PI*2); ctx.fill();
+  ctx.restore();
+  ctx.fillStyle='#c06040';
+  ctx.font='10px sans-serif';
+  ctx.fillText('M1', w1x-8, w1y-Ra*S-4);
+
+  // --- Motor wheel 2 ---
+  const w2x=originX+18, w2y=originY+20;
+  const p2=crankPos(w2x,w2y,Ra*S,th2);
+  ctx.save();
+  ctx.strokeStyle='#50c080';
+  ctx.lineWidth=1.2;
+  ctx.beginPath(); ctx.arc(w2x,w2y,Ra*S,0,Math.PI*2); ctx.stroke();
+  ctx.strokeStyle='#70e090';
+  ctx.lineWidth=2;
+  ctx.beginPath(); ctx.moveTo(w2x,w2y); ctx.lineTo(p2.x,p2.y); ctx.stroke();
+  ctx.fillStyle='#70e090';
+  ctx.beginPath(); ctx.arc(p2.x,p2.y,3,0,Math.PI*2); ctx.fill();
+  ctx.restore();
+  ctx.fillStyle='#40a060';
+  ctx.font='10px sans-serif';
+  ctx.fillText('M2', w2x-8, w2y+Ra*S+12);
+
+  // --- Connecting rod from crank pins to reel ---
+  ctx.save();
+  ctx.strokeStyle='rgba(150,180,220,0.5)';
+  ctx.lineWidth=1;
+  ctx.setLineDash([3,3]);
+  ctx.beginPath(); ctx.moveTo(p1.x,p1.y); ctx.lineTo(rx,ry); ctx.stroke();
+  ctx.beginPath(); ctx.moveTo(p2.x,p2.y); ctx.lineTo(rx,ry); ctx.stroke();
+  ctx.restore();
+
+  // --- Wire from reel to tail entry ---
+  const wireEntryX=originX+70, wireEntryY=originY;
+  const wireAnchorX=wireEntryX, wireAnchorY=wireEntryY+d_wire*S*Math.sin(theta_a);
+  ctx.save();
+  ctx.strokeStyle='rgba(255,200,80,0.9)';
+  ctx.lineWidth=1.5;
+  ctx.setLineDash([4,2]);
+  ctx.beginPath();
+  ctx.moveTo(rx, ry);
+  ctx.quadraticCurveTo(reelX+10, wireEntryY, wireEntryX, wireAnchorY);
+  ctx.stroke();
+  ctx.setLineDash([]);
+  ctx.restore();
+  ctx.fillStyle='#c0a040';
+  ctx.font='10px sans-serif';
+  ctx.fillText('wire', reelX+18, wireEntryY-8);
+
+  // --- Draw elastic tail arc ---
+  if(pts.length>1){
+    ctx.save();
+    ctx.translate(wireEntryX, wireEntryY);
+    // Tail body as thick gradient stroke
+    ctx.beginPath();
+    ctx.moveTo(pts[0].x*S, pts[0].y*S);
+    for(let i=1;i<pts.length;i++) ctx.lineTo(pts[i].x*S, pts[i].y*S);
+    ctx.strokeStyle='#4a7acc';
+    ctx.lineWidth=16;
+    ctx.lineCap='butt';
+    ctx.stroke();
+    // Highlight stripe
+    ctx.beginPath();
+    ctx.moveTo(pts[0].x*S, pts[0].y*S);
+    for(let i=1;i<pts.length;i++) ctx.lineTo(pts[i].x*S, pts[i].y*S);
+    ctx.strokeStyle='rgba(180,210,255,0.25)';
+    ctx.lineWidth=4;
+    ctx.stroke();
+    // Centerline (spine)
+    ctx.beginPath();
+    ctx.moveTo(pts[0].x*S, pts[0].y*S);
+    for(let i=1;i<pts.length;i++) ctx.lineTo(pts[i].x*S, pts[i].y*S);
+    ctx.strokeStyle='rgba(255,255,255,0.15)';
+    ctx.lineWidth=1;
+    ctx.setLineDash([4,4]);
+    ctx.stroke();
+    ctx.setLineDash([]);
+
+    // Caudal fin at tip
+    const tip=pts[pts.length-1];
+    const tipX=tip.x*S, tipY=tip.y*S;
+    const pre=pts[pts.length-4];
+    const ang=Math.atan2(tip.y-pre.y, tip.x-pre.x);
+    ctx.translate(tipX, tipY);
+    ctx.rotate(ang);
+    ctx.fillStyle='#3a6ab0';
+    ctx.strokeStyle='#6090d8';
+    ctx.lineWidth=1;
+    ctx.beginPath();
+    ctx.moveTo(0,0);
+    ctx.lineTo(-12,-18); ctx.lineTo(8,-14); ctx.lineTo(0,0);
+    ctx.closePath(); ctx.fill(); ctx.stroke();
+    ctx.beginPath();
+    ctx.moveTo(0,0);
+    ctx.lineTo(-12,18); ctx.lineTo(8,14); ctx.lineTo(0,0);
+    ctx.closePath(); ctx.fill(); ctx.stroke();
+    ctx.restore();
+
+    // Tip dot (in canvas space)
+    const tipCanvasX=wireEntryX+pts[pts.length-1].x*S;
+    const tipCanvasY=wireEntryY+pts[pts.length-1].y*S;
+    ctx.save();
+    ctx.fillStyle='#ffcc44';
+    ctx.beginPath(); ctx.arc(tipCanvasX,tipCanvasY,4,0,Math.PI*2); ctx.fill();
+    ctx.restore();
+  }
+
+  // --- Segment markers along tail ---
+  for(let i=0;i<=3;i++){
+    const idx=Math.floor(i*pts.length/3);
+    const p=pts[Math.min(idx,pts.length-1)];
+    ctx.save();
+    ctx.fillStyle='rgba(120,160,220,0.4)';
+    ctx.beginPath();
+    ctx.arc(wireEntryX+p.x*S, wireEntryY+p.y*S, 3, 0, Math.PI*2);
+    ctx.fill();
+    ctx.restore();
+  }
+
+  // --- Origin dot ---
+  ctx.fillStyle='#ffffff';
+  ctx.beginPath(); ctx.arc(originX,originY,3,0,Math.PI*2); ctx.fill();
+
+  // --- Update stats ---
+  document.getElementById('sv-freq').textContent=freq.toFixed(1)+' Hz';
+  document.getElementById('sv-ta').textContent=(theta_a*180/Math.PI).toFixed(1)+'°';
+  document.getElementById('sv-t3').textContent=(th3_val*180/Math.PI).toFixed(1)+'°';
+  const tipY_mm=pts[pts.length-1]?.y ?? 0;
+  document.getElementById('sv-ty').textContent=tipY_mm.toFixed(1)+' mm';
+
+  requestAnimationFrame(draw);
+}
+
+// Controls
+document.getElementById('sl-freq').addEventListener('input',e=>{
+  freq=e.target.value/10;
+  document.getElementById('lb-freq').textContent=freq.toFixed(1);
+});
+document.getElementById('sl-amp').addEventListener('input',e=>{
+  amp=parseInt(e.target.value)*Math.PI/180;
+  document.getElementById('lb-amp').textContent=e.target.value;
+});
+document.getElementById('sel-mode').addEventListener('change',e=>{
+  mode=e.target.value;
+  document.getElementById('bias-row').style.display=mode==='asym'?'flex':'none';
+});
+document.getElementById('sl-bias').addEventListener('input',e=>{
+  bias2=parseInt(e.target.value)*Math.PI/180;
+  document.getElementById('lb-bias2').textContent=e.target.value;
+});
+
+window.addEventListener('resize',resize);
+draw();
+</script>

@@ -1,0 +1,804 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<title>Fish Robot — 2-DoF Crank-Slider IK Simulator</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600&family=Syne:wght@400;600;700&display=swap');
+
+  :root {
+    --bg:       #0d0f14;
+    --surface:  #13161f;
+    --panel:    #181c27;
+    --border:   #252a38;
+    --border2:  #2e3548;
+    --teal:     #00d4aa;
+    --coral:    #ff6b52;
+    --purple:   #8b7df8;
+    --amber:    #f5a623;
+    --dim:      #4a5268;
+    --text:     #c8d0e8;
+    --texthi:   #eef0f8;
+    --mono:     'JetBrains Mono', monospace;
+    --sans:     'Syne', sans-serif;
+  }
+
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: var(--mono);
+    font-size: 13px;
+    line-height: 1.6;
+    min-height: 100vh;
+    padding: 24px;
+  }
+
+  header {
+    display: flex;
+    align-items: baseline;
+    gap: 16px;
+    margin-bottom: 28px;
+    border-bottom: 1px solid var(--border);
+    padding-bottom: 16px;
+  }
+
+  header h1 {
+    font-family: var(--sans);
+    font-size: 20px;
+    font-weight: 700;
+    color: var(--texthi);
+    letter-spacing: -0.5px;
+  }
+
+  header .sub {
+    font-size: 11px;
+    color: var(--dim);
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+  }
+
+  .layout {
+    display: grid;
+    grid-template-columns: 1fr 340px;
+    gap: 16px;
+    max-width: 1200px;
+  }
+
+  @media (max-width: 900px) {
+    .layout { grid-template-columns: 1fr; }
+  }
+
+  .panel {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 18px;
+  }
+
+  .panel-title {
+    font-family: var(--sans);
+    font-size: 11px;
+    font-weight: 600;
+    color: var(--dim);
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    margin-bottom: 14px;
+  }
+
+  /* Canvas */
+  #canvas-wrap {
+    background: var(--panel);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    overflow: hidden;
+    margin-bottom: 16px;
+  }
+
+  canvas { display: block; width: 100%; }
+
+  /* Mode toggle */
+  .mode-row {
+    display: flex;
+    gap: 8px;
+    margin-bottom: 16px;
+  }
+
+  .mode-btn {
+    flex: 1;
+    padding: 8px 12px;
+    background: transparent;
+    border: 1px solid var(--border2);
+    border-radius: 6px;
+    color: var(--dim);
+    font-family: var(--mono);
+    font-size: 12px;
+    cursor: pointer;
+    transition: all 0.15s;
+  }
+
+  .mode-btn:hover { border-color: var(--border2); color: var(--text); }
+
+  .mode-btn.active-sym  { border-color: var(--teal);   color: var(--teal);   background: rgba(0,212,170,0.06); }
+  .mode-btn.active-asym { border-color: var(--coral);  color: var(--coral);  background: rgba(255,107,82,0.06); }
+
+  /* Sliders */
+  .slider-group { margin-bottom: 14px; }
+
+  .slider-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: baseline;
+    margin-bottom: 6px;
+  }
+
+  .slider-name { font-size: 12px; }
+  .slider-val  { font-size: 14px; font-weight: 600; color: var(--texthi); }
+
+  input[type=range] {
+    width: 100%;
+    -webkit-appearance: none;
+    appearance: none;
+    height: 3px;
+    border-radius: 2px;
+    background: var(--border2);
+    outline: none;
+    cursor: pointer;
+  }
+
+  input[type=range]::-webkit-slider-thumb {
+    -webkit-appearance: none;
+    width: 14px; height: 14px;
+    border-radius: 50%;
+    cursor: pointer;
+    transition: transform 0.1s;
+  }
+
+  input[type=range]::-webkit-slider-thumb:hover { transform: scale(1.2); }
+
+  .sl-m1::-webkit-slider-thumb { background: var(--teal); }
+  .sl-m1 { accent-color: var(--teal); }
+  .sl-m2::-webkit-slider-thumb { background: var(--coral); }
+  .sl-m2 { accent-color: var(--coral); }
+
+  input[type=range]:disabled { opacity: 0.3; cursor: not-allowed; }
+
+  /* Metrics grid */
+  .metrics {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 8px;
+    margin-bottom: 16px;
+  }
+
+  .metric-card {
+    background: var(--panel);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 10px 14px;
+  }
+
+  .metric-label { font-size: 10px; color: var(--dim); letter-spacing: 0.08em; text-transform: uppercase; margin-bottom: 4px; }
+  .metric-value { font-size: 22px; font-weight: 600; color: var(--texthi); font-family: var(--sans); }
+  .metric-value.ok   { color: var(--teal); }
+  .metric-value.err  { color: var(--coral); }
+  .metric-value.warn { color: var(--amber); }
+
+  /* Formula display */
+  .formula-box {
+    background: var(--panel);
+    border: 1px solid var(--border);
+    border-left: 3px solid var(--purple);
+    border-radius: 0 6px 6px 0;
+    padding: 10px 14px;
+    margin-bottom: 16px;
+    font-size: 12px;
+    color: var(--purple);
+    min-height: 42px;
+    word-break: break-all;
+  }
+
+  /* IK inverse panel */
+  .ik-panel { margin-top: 0; }
+
+  .ik-result-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 8px 0;
+    border-bottom: 1px solid var(--border);
+    font-size: 12px;
+  }
+
+  .ik-result-row:last-child { border-bottom: none; }
+
+  .ik-key   { color: var(--dim); }
+  .ik-value { font-weight: 600; color: var(--texthi); }
+  .ik-value.ok   { color: var(--teal); }
+  .ik-value.err  { color: var(--coral); }
+
+  .badge {
+    display: inline-block;
+    padding: 2px 8px;
+    border-radius: 4px;
+    font-size: 10px;
+    font-weight: 600;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+  }
+
+  .badge-ok  { background: rgba(0,212,170,0.12); color: var(--teal); }
+  .badge-err { background: rgba(255,107,82,0.12); color: var(--coral); }
+
+  /* Equations reference */
+  .eq-ref {
+    margin-top: 16px;
+    border-top: 1px solid var(--border);
+    padding-top: 14px;
+  }
+
+  .eq-block {
+    margin-bottom: 10px;
+    padding: 8px 12px;
+    background: var(--panel);
+    border-radius: 6px;
+    font-size: 11px;
+    line-height: 1.7;
+    color: var(--text);
+  }
+
+  .eq-block .eq-head { color: var(--amber); font-weight: 600; margin-bottom: 2px; font-size: 10px; letter-spacing: 0.08em; text-transform: uppercase; }
+  .eq-block .eq-body { color: var(--texthi); }
+
+  /* Legend dots */
+  .leg-dot { display: inline-block; width: 10px; height: 10px; border-radius: 50%; margin-right: 4px; vertical-align: middle; }
+</style>
+</head>
+<body>
+
+<header>
+  <h1>Fish Robot IK Simulator</h1>
+  <span class="sub">2-DoF crank-slider · Wang et al. 2026</span>
+</header>
+
+<div class="layout">
+
+  <!-- LEFT: canvas + controls -->
+  <div>
+    <div class="panel" style="margin-bottom:16px;">
+      <div class="panel-title">Mechanism view</div>
+      <div id="canvas-wrap">
+        <canvas id="cv" height="320"></canvas>
+      </div>
+
+      <div class="mode-row">
+        <button class="mode-btn active-sym" id="btn-sym" onclick="setMode('sym')">Symmetric (θ₁ = θ₂)</button>
+        <button class="mode-btn" id="btn-asym" onclick="setMode('asym')">Asymmetric</button>
+      </div>
+
+      <div class="slider-group">
+        <div class="slider-header">
+          <span class="slider-name" style="color:var(--teal)">Motor 1 — θ₁</span>
+          <span class="slider-val" id="v1" style="color:var(--teal)">45°</span>
+        </div>
+        <input type="range" class="sl-m1" id="sl1" min="-180" max="180" value="45" step="1" oninput="onSlider()">
+      </div>
+
+      <div class="slider-group">
+        <div class="slider-header">
+          <span class="slider-name" id="lbl2" style="color:var(--coral)">Motor 2 — θ₂ (= θ₁)</span>
+          <span class="slider-val" id="v2" style="color:var(--coral)">45°</span>
+        </div>
+        <input type="range" class="sl-m2" id="sl2" min="-180" max="180" value="45" step="1" oninput="onSlider()" disabled>
+      </div>
+    </div>
+
+    <!-- Equations reference -->
+    <div class="panel">
+      <div class="panel-title">Equations reference</div>
+      <div class="eq-ref">
+        <div class="eq-block">
+          <div class="eq-head">Forward kinematics (Eq. 2a–d)</div>
+          <div class="eq-body">
+            θ₃ = arcsin(C / √(A²+B²)) − arctan(B/A)<br>
+            A = RaRb(cosθ₁−cosθ₂) + Rb(L₁+L₂)<br>
+            B = RaRb(sinθ₂−sinθ₁)<br>
+            C = Ra²·sin(θ₁−θ₂) − Ra(sinθ₁·L₂ + sinθ₂·L₁)
+          </div>
+        </div>
+        <div class="eq-block">
+          <div class="eq-head">IK — Symmetric mode</div>
+          <div class="eq-body">
+            θ₁ = θ₂ = −arcsin( Rb/Ra · sinθ₃* )<br>
+            Valid when |Rb·sinθ₃*| ≤ Ra
+          </div>
+        </div>
+        <div class="eq-block">
+          <div class="eq-head">IK — Asymmetric mode (θ₂ fixed)</div>
+          <div class="eq-body">
+            P·sinθ₁ + Q·cosθ₁ = S<br>
+            θ₁ = arctan(Q/P) ± arccos(S / √(P²+Q²))<br>
+            Two branches → pick one within motor range
+          </div>
+        </div>
+        <div class="eq-block">
+          <div class="eq-head">Velocity IK — asymmetric mode (Eq. 3 inverted)</div>
+          <div class="eq-body">
+            θ̇₁ = θ̇₃* · Rb·cos(θ₃−θ_rod) / [ Ra·cos(θ₁−θ_rod)·(1 + d₁/(d₁+d₂)) ]<br>
+            Note: state-dependent gain — changes as mechanism moves
+          </div>
+        </div>
+        <div class="eq-block">
+          <div class="eq-head">Tail angle (Eq. 7)</div>
+          <div class="eq-body">θa = Rb·θ₃ / d     where d = wire offset from spine centreline</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- RIGHT: metrics + IK inverse -->
+  <div>
+    <div class="panel" style="margin-bottom:16px;">
+      <div class="panel-title">Live outputs</div>
+
+      <div class="metrics">
+        <div class="metric-card">
+          <div class="metric-label">Reel θ₃</div>
+          <div class="metric-value" id="m-t3">—</div>
+        </div>
+        <div class="metric-card">
+          <div class="metric-label">Tail angle θa</div>
+          <div class="metric-value" id="m-ta">—</div>
+        </div>
+        <div class="metric-card">
+          <div class="metric-label">Reachability</div>
+          <div class="metric-value" id="m-reach"><span class="badge badge-ok">OK</span></div>
+        </div>
+        <div class="metric-card">
+          <div class="metric-label">Rod angle θ_rod</div>
+          <div class="metric-value" id="m-rod">—</div>
+        </div>
+      </div>
+
+      <div class="panel-title" style="margin-bottom:6px;">Active IK formula</div>
+      <div class="formula-box" id="m-eq">—</div>
+
+      <div style="display:flex;gap:14px;font-size:11px;color:var(--dim);">
+        <span><span class="leg-dot" style="background:var(--teal)"></span>Motor 1 / Wheel 1</span>
+        <span><span class="leg-dot" style="background:var(--coral)"></span>Motor 2 / Wheel 2</span>
+        <span><span class="leg-dot" style="background:var(--purple)"></span>Reel</span>
+      </div>
+    </div>
+
+    <!-- IK Inverse solver -->
+    <div class="panel ik-panel">
+      <div class="panel-title">IK reverse solver</div>
+      <div style="font-size:11px;color:var(--dim);margin-bottom:12px;">
+        Set desired θ₃* → compute required motor angles
+      </div>
+
+      <div class="slider-group">
+        <div class="slider-header">
+          <span class="slider-name" style="color:var(--purple)">Desired θ₃*</span>
+          <span class="slider-val" id="vt3d" style="color:var(--purple)">20°</span>
+        </div>
+        <input type="range" min="-60" max="60" value="20" id="sl-t3d" step="1"
+               style="accent-color:var(--purple)" oninput="updateIK()">
+      </div>
+
+      <div class="ik-result-row">
+        <span class="ik-key">Sym: θ₁ = θ₂</span>
+        <span class="ik-value" id="ik-sym">—</span>
+      </div>
+      <div class="ik-result-row">
+        <span class="ik-key">Asym (θ₂=90°): θ₁ branch+</span>
+        <span class="ik-value" id="ik-asym-p">—</span>
+      </div>
+      <div class="ik-result-row">
+        <span class="ik-key">Asym (θ₂=90°): θ₁ branch−</span>
+        <span class="ik-value" id="ik-asym-m">—</span>
+      </div>
+      <div class="ik-result-row">
+        <span class="ik-key">Reachability</span>
+        <span id="ik-reach"><span class="badge badge-ok">OK</span></span>
+      </div>
+
+      <!-- Velocity IK -->
+      <div style="margin-top:14px;border-top:1px solid var(--border);padding-top:14px;">
+        <div class="panel-title" style="margin-bottom:8px;">Velocity IK</div>
+        <div class="slider-group">
+          <div class="slider-header">
+            <span class="slider-name" style="color:var(--amber)">Desired θ̇₃* (rad/s)</span>
+            <span class="slider-val" id="vdot3" style="color:var(--amber)">2.0</span>
+          </div>
+          <input type="range" min="-10" max="10" value="2" id="sl-dot3" step="0.1"
+                 style="accent-color:var(--amber)" oninput="updateVelIK()">
+        </div>
+        <div class="ik-result-row">
+          <span class="ik-key">Required θ̇₁ (rad/s)</span>
+          <span class="ik-value" id="vdot1">—</span>
+        </div>
+        <div class="ik-result-row">
+          <span class="ik-key">Velocity gain k(θ)</span>
+          <span class="ik-value" id="vgain">—</span>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+/* ─── Parameters (prototype values from paper) ─── */
+const Ra = 30,   // wheel radius (mm, display units)
+      Rb = 38,   // reel radius
+      L1 = 180,  // offset reel→wheel1
+      L2 = 165,  // offset reel→wheel2
+      d_wire = 12; // wire offset from spine centreline
+
+let mode = 'sym';
+
+/* ─── Math helpers ─── */
+const rad = d => d * Math.PI / 180;
+const deg = r => r * 180 / Math.PI;
+const clamp = (v,lo,hi) => Math.max(lo, Math.min(hi, v));
+const fmt = (v, dp=1) => isFinite(v) ? v.toFixed(dp)+'°' : 'N/A';
+
+/* ─── Forward kinematics (Eq. 2a–d) ─── */
+function fk(t1r, t2r) {
+  const A = Ra*Rb*(Math.cos(t1r)-Math.cos(t2r)) + Rb*(L1+L2);
+  const B = Ra*Rb*(Math.sin(t2r)-Math.sin(t1r));
+  const C = Ra*Ra*Math.sin(t1r-t2r) - Ra*(Math.sin(t1r)*L2 + Math.sin(t2r)*L1);
+  const R = Math.sqrt(A*A + B*B);
+  const sinArg = C / R;
+  if (Math.abs(sinArg) > 1) return { ok: false };
+  const t3 = Math.asin(sinArg) - Math.atan2(B, A);
+  const t_rod = Math.atan2(Ra*Math.sin(t1r)-Ra*Math.sin(t2r),
+                            L1+L2+Ra*Math.cos(t1r)-Ra*Math.cos(t2r));
+  return { ok: true, t3, t_rod, A, B, C, R };
+}
+
+/* ─── Velocity IK (Eq. 3 inverted) ─── */
+function velIK(dot3, t1r, t3r, t_rod, d1, d2) {
+  const num = dot3 * Rb * Math.cos(t3r - t_rod);
+  const den = Ra * Math.cos(t1r - t_rod) * (1 + d1 / (d1 + d2));
+  if (Math.abs(den) < 1e-6) return { dot1: Infinity, gain: Infinity };
+  return { dot1: num / den, gain: num / den / dot3 };
+}
+
+/* ─── IK solvers ─── */
+function ikSym(t3dDeg) {
+  const t3r = rad(t3dDeg);
+  const arg = Rb / Ra * Math.sin(t3r);
+  if (Math.abs(arg) > 1) return { ok: false };
+  return { ok: true, t1: -Math.asin(arg) };
+}
+
+function ikAsym(t3dDeg, t2fixed_deg) {
+  // Re-derive P, Q, S by putting collinearity constraint in form P sinθ₁ + Q cosθ₁ = S
+  // with known t3* and t2
+  const t3r = rad(t3dDeg), t2r = rad(t2fixed_deg);
+  const s2=Math.sin(t2r), c2=Math.cos(t2r), s3=Math.sin(t3r), c3=Math.cos(t3r);
+
+  // From collinearity, cross-multiplied and expanded, collecting sinθ₁ and cosθ₁:
+  // Left point: Wheel1 at (Ra cosθ₁ + L1+L2, Ra sinθ₁)
+  // Mid point:  Reel   at (Rb cosθ₃ + L2,    Rb sinθ₃)
+  // Right point:Wheel2 at (Ra cosθ₂,          Ra sinθ₂)
+  //
+  // Slope(W1,Reel) = Slope(Reel,W2)
+  // (Ra sinθ₁ - Rb s3) / (Ra cosθ₁ + L1 + L2 - Rb c3 - L2)
+  //   = (Rb s3 - Ra s2) / (Rb c3 + L2 - Ra c2)
+  //
+  // Cross-multiply and collect:
+  const dx_reel_w2 = Rb*c3 + L2 - Ra*c2;
+  const dy_reel_w2 = Rb*s3 - Ra*s2;
+  // (Ra sinθ₁ - Rb s3)(dx_reel_w2) = (dy_reel_w2)(Ra cosθ₁ + L1 - Rb c3)
+  // Ra·dx_reel_w2·sinθ₁ - Rb s3·dx_reel_w2 = Ra·dy_reel_w2·cosθ₁ + dy_reel_w2·(L1 - Rb c3)
+  // Ra·dx_reel_w2·sinθ₁ - Ra·dy_reel_w2·cosθ₁ = dy_reel_w2·(L1 - Rb c3) + Rb s3·dx_reel_w2
+  const P = Ra * dx_reel_w2;
+  const Q = -Ra * dy_reel_w2;
+  const S = dy_reel_w2*(L1 - Rb*c3) + Rb*s3*dx_reel_w2;
+
+  const R = Math.sqrt(P*P + Q*Q);
+  if (R < 1e-9) return { ok: false };
+  const cosArg = S / R;
+  if (Math.abs(cosArg) > 1) return { ok: false };
+  const phi = Math.atan2(Q, P);
+  const delta = Math.acos(cosArg);
+  return { ok: true, t1p: phi + delta, t1m: phi - delta };
+}
+
+/* ─── Canvas drawing ─── */
+const cv = document.getElementById('cv');
+const ctx = cv.getContext('2d');
+
+function resize() {
+  const wrap = document.getElementById('canvas-wrap');
+  cv.width  = wrap.clientWidth;
+  cv.height = 320;
+}
+
+window.addEventListener('resize', () => { resize(); draw(lastT1, lastT2); });
+resize();
+
+let lastT1 = rad(45), lastT2 = rad(45);
+
+function draw(t1r, t2r) {
+  const W = cv.width, H = cv.height;
+  ctx.clearRect(0, 0, W, H);
+
+  const S = 0.60;             // scale factor
+  const cx = W/2, cy = H/2;
+  const w2x = cx - L2*S, w1x = cx + L1*S;
+
+  // Grid
+  ctx.strokeStyle = '#1a1f2e';
+  ctx.lineWidth = 1;
+  for (let x=0; x<W; x+=40) { ctx.beginPath(); ctx.moveTo(x,0); ctx.lineTo(x,H); ctx.stroke(); }
+  for (let y=0; y<H; y+=40) { ctx.beginPath(); ctx.moveTo(0,y); ctx.lineTo(W,y); ctx.stroke(); }
+
+  const { ok, t3, t_rod } = fk(t1r, t2r);
+
+  // Rod
+  ctx.beginPath();
+  ctx.moveTo(w2x, cy); ctx.lineTo(w1x, cy);
+  ctx.strokeStyle = '#252a38';
+  ctx.lineWidth = 14;
+  ctx.lineCap = 'round';
+  ctx.stroke();
+  ctx.strokeStyle = '#2e3548';
+  ctx.lineWidth = 10;
+  ctx.stroke();
+
+  // Driving wire
+  if (ok) {
+    ctx.beginPath();
+    ctx.setLineDash([6,4]);
+    ctx.moveTo(cx - Rb*S*Math.cos(t3) - 12, cy - Rb*S*Math.sin(t3));
+    ctx.lineTo(Math.max(30, cx - Rb*S*Math.cos(t3) - 60), cy - Rb*S*Math.sin(t3));
+    ctx.strokeStyle = '#4a5268';
+    ctx.lineWidth = 2;
+    ctx.lineCap = 'butt';
+    ctx.stroke();
+    ctx.setLineDash([]);
+    // arrow
+    const ax = Math.max(30, cx - Rb*S*Math.cos(t3) - 60);
+    ctx.beginPath();
+    ctx.moveTo(ax, cy - Rb*S*Math.sin(t3));
+    ctx.lineTo(ax - 8, cy - Rb*S*Math.sin(t3) - 5);
+    ctx.lineTo(ax - 8, cy - Rb*S*Math.sin(t3) + 5);
+    ctx.closePath();
+    ctx.fillStyle = '#4a5268';
+    ctx.fill();
+    ctx.fillStyle = '#4a5268';
+    ctx.font = '10px JetBrains Mono';
+    ctx.fillText('→ tail', Math.max(12, ax-52), cy - Rb*S*Math.sin(t3) - 7);
+  }
+
+  // Draw a wheel/circle component
+  function drawWheel(x, y, radius, angle, color, label, dimmed) {
+    const alpha = dimmed ? 0.35 : 1;
+    ctx.globalAlpha = alpha;
+
+    // Circle fill
+    ctx.beginPath();
+    ctx.arc(x, y, radius*S, 0, Math.PI*2);
+    ctx.fillStyle = color + '18';
+    ctx.fill();
+    ctx.strokeStyle = color;
+    ctx.lineWidth = 1.5;
+    ctx.stroke();
+
+    // Angle arm
+    ctx.beginPath();
+    ctx.moveTo(x, y);
+    ctx.lineTo(x + radius*S*Math.cos(angle), y + radius*S*Math.sin(angle));
+    ctx.strokeStyle = color;
+    ctx.lineWidth = 2;
+    ctx.lineCap = 'round';
+    ctx.stroke();
+
+    // Pivot
+    ctx.beginPath();
+    ctx.arc(x, y, 4, 0, Math.PI*2);
+    ctx.fillStyle = color;
+    ctx.fill();
+
+    // Label
+    ctx.fillStyle = color;
+    ctx.font = '500 12px Syne';
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    ctx.fillText(label, x, y - 2);
+
+    ctx.globalAlpha = 1;
+  }
+
+  // Wheel 2 (coral)
+  drawWheel(w2x, cy, Ra, t2r, '#ff6b52', 'W2', false);
+  // Wheel 1 (teal)
+  drawWheel(w1x, cy, Ra, t1r, '#00d4aa', 'W1', false);
+  // Reel (purple)
+  drawWheel(cx, cy, Rb, ok ? t3 : 0, ok ? '#8b7df8' : '#4a5268', 'Reel', !ok);
+
+  // Angle arcs labels
+  function drawAngleLabel(x, y, angle, color, label, side) {
+    const tx = x + (Ra*S + 14) * (side === 'r' ? 1 : -1);
+    ctx.fillStyle = color;
+    ctx.font = '11px JetBrains Mono';
+    ctx.textAlign = side === 'r' ? 'left' : 'right';
+    ctx.fillText(label, tx, y - Ra*S - 10);
+  }
+
+  ctx.fillStyle = '#00d4aa';
+  ctx.font = '11px JetBrains Mono';
+  ctx.textAlign = 'right';
+  ctx.textBaseline = 'alphabetic';
+  ctx.fillText('θ₁='+Math.round(deg(t1r))+'°', w1x + Ra*S + 8, cy - Ra*S - 6);
+
+  ctx.fillStyle = '#ff6b52';
+  ctx.textAlign = 'left';
+  ctx.fillText('θ₂='+Math.round(deg(t2r))+'°', w2x - Ra*S - 8, cy - Ra*S - 6);
+
+  if (ok) {
+    ctx.fillStyle = '#8b7df8';
+    ctx.textAlign = 'center';
+    ctx.fillText('θ₃='+Math.round(deg(t3))+'°', cx, cy - Rb*S - 16);
+
+    // Rod angle indicator
+    ctx.fillStyle = '#4a5268';
+    ctx.textAlign = 'center';
+    ctx.fillText('θ_rod='+Math.round(deg(t_rod))+'°', cx, H - 14);
+  } else {
+    ctx.fillStyle = '#ff6b52';
+    ctx.textAlign = 'center';
+    ctx.font = '12px Syne';
+    ctx.fillText('Singularity — configuration unreachable', cx, cy - Rb*S - 16);
+  }
+
+  // Dimension lines
+  ctx.setLineDash([3,3]);
+  ctx.strokeStyle = '#252a38';
+  ctx.lineWidth = 1;
+  ctx.beginPath(); ctx.moveTo(w2x, cy+55); ctx.lineTo(cx, cy+55); ctx.stroke();
+  ctx.beginPath(); ctx.moveTo(cx, cy+55);  ctx.lineTo(w1x, cy+55); ctx.stroke();
+  ctx.setLineDash([]);
+  ctx.fillStyle = '#3a4058';
+  ctx.textAlign = 'center';
+  ctx.font = '10px JetBrains Mono';
+  ctx.fillText('L₂', (w2x+cx)/2, cy+68);
+  ctx.fillText('L₁', (cx+w1x)/2, cy+68);
+}
+
+/* ─── UI update ─── */
+function onSlider() {
+  let t1d = +document.getElementById('sl1').value;
+  let t2d;
+
+  if (mode === 'sym') {
+    t2d = t1d;
+    document.getElementById('sl2').value = t1d;
+  } else {
+    t2d = +document.getElementById('sl2').value;
+  }
+
+  document.getElementById('v1').textContent = t1d + '°';
+  document.getElementById('v2').textContent = t2d + '°';
+
+  const t1r = rad(t1d), t2r = rad(t2d);
+  lastT1 = t1r; lastT2 = t2r;
+
+  const res = fk(t1r, t2r);
+
+  if (res.ok) {
+    const t3d = Math.round(deg(res.t3)*10)/10;
+    const tad = Math.round(Rb * res.t3 / d_wire * 10)/10;
+    const rodd = Math.round(deg(res.t_rod)*10)/10;
+
+    document.getElementById('m-t3').textContent   = t3d + '°';
+    document.getElementById('m-ta').textContent   = tad + '°';
+    document.getElementById('m-rod').textContent  = rodd + '°';
+    document.getElementById('m-t3').className     = 'metric-value ok';
+    document.getElementById('m-ta').className     = 'metric-value ok';
+    document.getElementById('m-reach').innerHTML  = '<span class="badge badge-ok">Reachable</span>';
+  } else {
+    document.getElementById('m-t3').textContent   = 'N/A';
+    document.getElementById('m-ta').textContent   = 'N/A';
+    document.getElementById('m-rod').textContent  = 'N/A';
+    document.getElementById('m-t3').className     = 'metric-value err';
+    document.getElementById('m-ta').className     = 'metric-value err';
+    document.getElementById('m-reach').innerHTML  = '<span class="badge badge-err">Singular</span>';
+  }
+
+  document.getElementById('m-eq').textContent = mode === 'sym'
+    ? 'θ₁ = θ₂ = −arcsin(Rb/Ra · sinθ₃*)    [symmetric IK]'
+    : 'P·sinθ₁ + Q·cosθ₁ = S  →  θ₁ = arctan(Q/P) ± arccos(S/√(P²+Q²))    [asymmetric IK]';
+
+  draw(t1r, t2r);
+  updateVelIK();
+}
+
+function setMode(m) {
+  mode = m;
+  document.getElementById('btn-sym').className  = 'mode-btn' + (m==='sym'  ? ' active-sym'  : '');
+  document.getElementById('btn-asym').className = 'mode-btn' + (m==='asym' ? ' active-asym' : '');
+  const sl2 = document.getElementById('sl2');
+  const lbl2 = document.getElementById('lbl2');
+  if (m === 'sym') {
+    sl2.disabled = true;
+    lbl2.textContent = 'Motor 2 — θ₂ (= θ₁)';
+  } else {
+    sl2.disabled = false;
+    lbl2.textContent = 'Motor 2 — θ₂ (fixed steer)';
+  }
+  onSlider();
+}
+
+/* ─── IK reverse solver ─── */
+function updateIK() {
+  const t3d = +document.getElementById('sl-t3d').value;
+  document.getElementById('vt3d').textContent = t3d + '°';
+
+  // Symmetric
+  const sym = ikSym(t3d);
+  if (sym.ok) {
+    document.getElementById('ik-sym').textContent = (Math.round(deg(sym.t1)*10)/10) + '°';
+    document.getElementById('ik-sym').className = 'ik-value ok';
+  } else {
+    document.getElementById('ik-sym').textContent = 'unreachable';
+    document.getElementById('ik-sym').className = 'ik-value err';
+  }
+
+  // Asymmetric (θ₂ fixed at 90°)
+  const asym = ikAsym(t3d, 90);
+  if (asym.ok) {
+    document.getElementById('ik-asym-p').textContent = (Math.round(deg(asym.t1p)*10)/10) + '°';
+    document.getElementById('ik-asym-m').textContent = (Math.round(deg(asym.t1m)*10)/10) + '°';
+    document.getElementById('ik-asym-p').className = 'ik-value ok';
+    document.getElementById('ik-asym-m').className = 'ik-value ok';
+  } else {
+    document.getElementById('ik-asym-p').textContent = 'unreachable';
+    document.getElementById('ik-asym-m').textContent = 'unreachable';
+    document.getElementById('ik-asym-p').className = 'ik-value err';
+    document.getElementById('ik-asym-m').className = 'ik-value err';
+  }
+
+  const reach = sym.ok || asym.ok;
+  document.getElementById('ik-reach').innerHTML = reach
+    ? '<span class="badge badge-ok">Reachable</span>'
+    : '<span class="badge badge-err">Out of range</span>';
+}
+
+/* ─── Velocity IK ─── */
+function updateVelIK() {
+  const dot3 = +document.getElementById('sl-dot3').value;
+  document.getElementById('vdot3').textContent = dot3.toFixed(1);
+
+  const res = fk(lastT1, lastT2);
+  if (!res.ok) {
+    document.getElementById('vdot1').textContent = 'N/A';
+    document.getElementById('vgain').textContent = 'N/A';
+    return;
+  }
+  // Distances d1, d2 from reel pivot to wheel pivots along rod
+  const d1 = L1, d2 = L2; // simplified: offsets equal distances along rod
+  const { dot1, gain } = velIK(dot3, lastT1, res.t3, res.t_rod, d1, d2);
+
+  if (!isFinite(dot1)) {
+    document.getElementById('vdot1').textContent = '∞ (singular)';
+    document.getElementById('vgain').textContent = '∞';
+    document.getElementById('vdot1').className = 'ik-value err';
+  } else {
+    document.getElementById('vdot1').textContent = dot1.toFixed(3) + ' rad/s';
+    document.getElementById('vgain').textContent = gain.toFixed(3);
+    document.getElementById('vdot1').className = 'ik-value ok';
+  }
+}
+
+/* ─── Init ─── */
+setMode('sym');
+updateIK();
+</script>
+</body>
+</html>
