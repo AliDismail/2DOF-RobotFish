@@ -229,7 +229,7 @@ Despite these limitations, the model provides a computationally efficient framew
 
 _Figure 3: Coordinate Systems And Kinematic Parameters Of The Fish Robot_
 
-![Figure 4: CADModelOfTheDual-CrankReelMechanismForTailActuation](images/CADModelOfTheDual-CrankReelMechanismForTailActuation.png)
+![Figure 4: CADModelOfTheDual-CrankReelMechanismForTailActuation](images/CADModelOfTheDual-CrankReelMechanismForTailActuation.jpg)
 
 _Figure 4: CAD Model Of The Dual-Crank Reel Mechanism For Tail Actuation_
 
