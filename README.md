@@ -142,88 +142,9 @@ The largest design difference is the actuator selection. The original research p
 
 ### Methodology and Implementation
 
-#### 1. System Overview
-
 The fish robot is designed based on a biomimetic actuation mechanism that converts rotational motor inputs into oscillatory tail motion. The system consists of two motor-driven cranks connected to a reel through linkages, forming a crank–slider mechanism. This configuration enables controlled deformation of a flexible tail, which generates propulsion through periodic motion (Lee et al., 2007).
 
-#### 2. Forward Kinematics Derivation
-
-The objective of forward kinematics is to compute the reel angle θ₃ from the known motor angles θ₁ and θ₂.
-
-**Coordinate Representation**
-
-The positions of the mechanism components are defined as:
-
-$$x_1 = R_a \cos\theta_1 + L_1 + L_2, \quad y_1 = R_a \sin\theta_1 \tag{1}$$
-
-$$x_2 = R_a \cos\theta_2, \quad y_2 = R_a \sin\theta_2 \tag{2}$$
-
-$$x_3 = R_b \cos\theta_3 + L_2, \quad y_3 = R_b \sin\theta_3 \tag{3}$$
-
-**Collinearity Constraint**
-
-The linkage points must remain collinear:
-
-$$\frac{y_2 - y_3}{x_2 - x_3} = \frac{y_1 - y_3}{x_1 - x_3} \tag{4}$$
-
-**Rearranged Form**
-
-After expansion and simplification using trigonometric identities, the equation is reduced to:
-
-$$A\cos\theta_3 + B\sin\theta_3 = C \tag{6}$$
-
-where:
-
-$$A = R_a R_b(\cos\theta_1 - \cos\theta_2) + R_b(L_1 + L_2) \tag{7}$$
-
-$$B = R_a R_b(\sin\theta_2 - \sin\theta_1) \tag{8}$$
-
-$$C = R_a^2 \sin(\theta_1 - \theta_2) - R_a(\sin\theta_1 \cdot L_2 + \sin\theta_2 \cdot L_1) \tag{9}$$
-
-**Closed-Form Solution**
-
-$$\theta_3 = \arcsin\left(\frac{C}{\sqrt{A^2 + B^2}}\right) - \text{atan2}(B, A) \tag{10}$$
-
-This transformation allows the nonlinear geometric constraint to be solved analytically, avoiding iterative numerical methods, and allows direct computation of the reel angle suitable for real-time embedded implementation (Lee et al., 2007).
-
-#### 3. Tail Kinematics
-
-The tail is modeled as a constant curvature arc:
-
-$$\theta_a = \frac{R_b}{d} \theta_3 \tag{11}$$
-
-$$x = \frac{L}{\theta_a}\sin\theta_a, \quad y = \frac{L}{\theta_a}(1 - \cos\theta_a) \tag{12}$$
-
-For small θₐ, a linear approximation is used to maintain numerical stability.
-
-#### 4. Velocity Estimation and Propulsion
-
-The reel angular velocity is approximated numerically:
-
-$$\dot{\theta}_3 \approx \frac{\theta_3(t) - \theta_3(t - \Delta t)}{\Delta t} \tag{13}$$
-
-The tail-tip lateral velocity is computed using:
-
-$$v_{tip} = \left|\frac{L}{\theta_a^2}\left(\sin\theta_a - \theta_a\cos\theta_a\right)\dot{\theta}_a\right| \tag{14}$$
-
-The swimming speed is then estimated using a proportional model:
-
-$$v_{robot} = k_{thrust} \cdot v_{tip} \tag{15}$$
-
-#### 5. Results and Interpretation
-
-The implementation produces periodic oscillatory motion of the tail, resulting in a stable forward swimming velocity. The symmetric mode generates balanced lateral motion, confirming that the robot moves in a straight line without directional bias. The results demonstrate that the derived kinematic model is consistent with the expected behavior of a biomimetic fish robot.
-
-#### 6. Discussion
-
-The model successfully integrates kinematics and motion generation; however, several simplifications are present:
-
-- Hydrodynamic effects are not explicitly modeled.
-- The propulsion model is simplified and experimentally tuned.
-- The tail is approximated as a constant curvature arc.
-- Numerical differentiation introduces approximation error.
-
-Despite these limitations, the model provides a computationally efficient framework for simulating robotic fish motion.
+Please find the detailed implementation and derivationm in the detailed report of the project.
 
 ![Figure 3: CoordinateSystemsAndKinematicParametersOfTheFishRobot](images/CoordinateSystemsAndKinematicParametersOfTheFishRobot.png)
 
@@ -232,61 +153,6 @@ _Figure 3: Coordinate Systems And Kinematic Parameters Of The Fish Robot_
 ![Figure 4: CADModelOfTheDual-CrankReelMechanismForTailActuation](images/CADModelOfTheDual-CrankReelMechanismForTailActuation.jpg)
 
 _Figure 4: CAD Model Of The Dual-Crank Reel Mechanism For Tail Actuation_
-
----
-
-### Symmetric Motion Case (Forward Motion)
-
-In the implemented test case, both motor angles are set equal (θ₁ = θ₂), corresponding to a symmetric actuation mode. Under this condition, the forward kinematics equations simplify significantly. Since θ₁ = θ₂:
-
-$$\cos\theta_1 - \cos\theta_2 = 0, \quad \sin\theta_2 - \sin\theta_1 = 0 \tag{17}$$
-
-Thus:
-
-$$A = R_b(L_1 + L_2), \quad B = 0 \tag{18}$$
-
-This simplification indicates that the mechanism operates in a symmetric configuration, where both sides of the system move identically. The generated motion produces a balanced tail deformation, leading to straight-line swimming behavior used for forward propulsion.
-
----
-
-### Non-symmetric Motion Case (Turning Motion)
-
-In the asymmetric mode, Motor 1 rotates continuously at angular velocity ω, while Motor 2 is held fixed at a constant angle θ₂ = φ (a chosen steering offset). The reel angle θ₃ therefore becomes a function of both φ and ω·t:
-
-$$[\theta_3, \dot{\theta}_3 ]= f_2(\varphi, \omega)$$
-
-#### 1. Reduction of the Collinearity Constraint
-
-Substituting θ₂ = φ and θ₁ = ω·t into Equations 7–9:
-
-$$A = R_a R_b(\cos\omega t - \cos\varphi) + R_b(L_1 + L_2) \tag{19}$$
-
-$$B = R_a R_b(\sin\varphi - \sin\omega t) \tag{20}$$
-
-$$C = R_a^2 \sin(\omega t - \varphi) - R_a(\sin\omega t \cdot L_2 + \sin\varphi \cdot L_1) \tag{21}$$
-
-The reel angle θ₃ oscillates about a non-zero mean angle determined by φ, still obtained from Equation 10.
-
-#### 2. Mean Oscillation Angle
-
-Fixing Motor 2 at φ ≠ 0 introduces a DC bias into the reel oscillation. When φ = 0, the mechanism is symmetric and θ₃ oscillates symmetrically about zero. When φ ≠ 0, the midpoint of the reel's oscillation shifts away from zero. The mean tail deflection follows from Equation 11:
-
-$$\bar{\theta}_a = \frac{R_b}{d} \bar{\theta}_3 \tag{23}$$
-
-where θ̄₃ is the time-averaged reel angle over one full rotation of Motor 1. A positive φ shifts the mean tail deflection to one side, generating a lateral force imbalance that causes the robot to turn.
-
-#### 3. Decoupling of Propulsion and Steering
-
-This mode achieves the central design goal of the 2-DoF mechanism — propulsion and steering are controlled by independent inputs:
-
-- **Motor 1** (rotating at ω): controls oscillation frequency, tail-beat speed, and forward thrust, independently of direction.
-- **Motor 2** (fixed at φ): controls the mean oscillation angle of the tail, and thus the turning direction and radius, independently of speed.
-
-The swimming speed and yaw direction are expressed jointly as:
-
-$$[v_{robot}, \psi_{robot}] = g_2(\theta_3, \dot{\theta}_3) = g_2(f_2(\varphi, \omega)) \tag{24}$$
-
-**Turn Direction**
 
 The sign of φ determines the direction of turning:
 
