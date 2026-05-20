@@ -145,7 +145,7 @@ _Figure 3: Coordinate Systems And Kinematic Parameters Of The Fish Robot_
 
 _Figure 4: CAD Model Of The Dual-Crank Reel Mechanism For Tail Actuation_
 
-The sign of φ determines the direction of turning:
+The sign of φ (the pitch angle between the the tip of the tail and the horizental line) determines the direction of turning:
 
 | φ value            | Effect                                           |
 | ------------------ | ------------------------------------------------ |
